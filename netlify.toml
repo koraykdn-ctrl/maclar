@@ -1,0 +1,11 @@
+[[redirects]]
+  from = "/fz/*"
+  to = "https://footballzz.co.uk/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/afr/*"
+  to = "https://afootballreport.com/:splat"
+  status = 200
+  force = true

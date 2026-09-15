@@ -1,0 +1,10 @@
+{
+  "rewrites": [
+    { "source": "/fz/:yol*", "destination": "/api/fz?yol=/:yol*" },
+    { "source": "/afr/:yol*", "destination": "/api/fz?site=afr&yol=/:yol*" }
+  ],
+  "crons": [
+    { "path": "/api/isit", "schedule": "0 5 * * *" },
+    { "path": "/api/isit", "schedule": "0 11 * * *" }
+  ]
+}

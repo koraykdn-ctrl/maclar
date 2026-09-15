@@ -1,0 +1,31 @@
+MAC BULUCU — NEREYE YUKLENIR?
+
+Klasorun KENDISINI surukleyip birak (icindeki dosyalar kok dizine gitmeli).
+api/ klasoru de gitmeli, yoksa uygulama yavas calisir.
+
+1) VERCEL (onerilen)
+   - vercel.com > Add New > Project > klasoru yukle
+   - api/fz.js      : sayfalari tarayici basligiyla ceker, CDN'de onbellekler
+   - api/toplu.js   : 10 mac sayfasini tek istekte paralel ceker (en buyuk hiz kazanci)
+   - Yonlendirmeyi vercel.json saglar.
+   - Kontrol: ADRES/fz/over-2.5-goals-football-predictions-and-tips/
+     Ingilizce mac listesi geliyorsa vekil calisiyor.
+
+2) NETLIFY
+   - app.netlify.com > Add new site > Deploy manually > klasoru surukle
+   - _redirects ve netlify.toml vekil yolunu saglar; api/ calismaz,
+     uygulama otomatik olarak tek tek cekmeye doner (daha yavas).
+
+3) CLOUDFLARE PAGES
+   - Calisir ama vekil yolu (/fz/) desteklenmez; uygulama veriyi yedek
+     yollardan ceker, daha yavas olur.
+
+NOT: Uygulama vekil olmadan da calisir, sadece daha yavastir.
+
+ON ISITMA (KV) — ISTEGE BAGLI AMA EN BUYUK HIZ KAZANCI
+   1) Vercel > proje > Storage > Create Database > Upstash for Redis (ucretsiz)
+      "Connect to Project" de; ortam degiskenleri otomatik gelir.
+   2) Yeniden deploy et.
+   3) Kontrol: ADRES/api/isit  -> {"ok":true,"isitilan":123,...} donmeli.
+      Cron gunde 2 kez (05:00 ve 11:00 UTC) bunu kendisi calistirir.
+   KV bagli degilse uygulama eskisi gibi calisir, sadece her sey siteden cekilir.
