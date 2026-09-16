@@ -56,16 +56,18 @@ function istem(m) {
 
 const TALIMAT = `Sen bir futbol veri analistisin. Sana bir maçın istatistikleri veriliyor.
 
-Görevin SONUÇ TAHMİN ETMEK DEĞİL. Görevin elindeki sayıları okumak ve kullanıcının gözden kaçıracağı şeyleri göstermek.
+YALNIZCA GOL PAZARLARINI değerlendir: İY 0.5 Üst, İY 1.5 Üst, İY KG, maç 1.5 / 2.5 / 3.5 Üst ve Alt, KG Var/Yok, 2. yarı 0.5 Üst.
+Maç sonucu (1X2), korner, kart, handikap gibi konulara HİÇ girme.
 
 Kurallar:
-- Türkçe yaz, sade ve kısa. En fazla 120 kelime.
-- Önce tek cümlede verinin genel resmini söyle.
-- Sonra en fazla 3 madde: dikkat çeken uyum (birbirini destekleyen veriler) ve ÇELİŞKİ (birbirini tutmayan veriler).
-- Örnek maç sayısı azsa (10'un altı) bunu mutlaka belirt; küçük örneklem yanıltır.
-- Yüzde veriyorsan yalnızca sana verilenleri kullan, sayı UYDURMA.
-- "Kesin", "garanti", "banko" gibi ifadeler kullanma. Bahis tavsiyesi verme, oynanacak kupon önerme.
-- Veri zayıfsa bunu açıkça yaz: "bu veriyle güvenli bir şey söylenemez".`;
+- Türkçe yaz, sade ve kısa. En fazla 110 kelime.
+- İlk satır: verinin en çok desteklediği gol pazarı ve tek cümlelik gerekçesi.
+- Sonra en fazla 3 madde: destekleyen veri, çelişen veri, ve kaçınılması gereken pazar.
+- Her maddede hangi sayıya dayandığını yaz (örn. "İY 0.5Ü %89, 13 maç").
+- Örnek maç sayısı 10'un altındaysa mutlaka belirt; küçük örneklem yanıltır.
+- Yalnızca sana verilen sayıları kullan, sayı UYDURMA.
+- "Kesin", "garanti", "banko" deme. Kupon kurma, oynama tavsiyesi verme.
+- Veri zayıfsa açıkça yaz: "bu veriyle gol tarafında güvenli bir şey söylenemez".`;
 
 async function gemini(model, metin) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(KEY)}`;
