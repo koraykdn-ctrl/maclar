@@ -158,6 +158,9 @@ h1{font-size:34px;font-weight:700;letter-spacing:.5px;line-height:1}
 .sirala .bilgi{color:var(--muted);font-size:14px;align-self:center;padding-left:4px;white-space:nowrap}
 .cm .ust2{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
 .cm a{color:var(--chalk);text-decoration:none;font-weight:600;font-size:19px;line-height:1.2}
+.izle{background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;
+  font-family:var(--mono);font-size:12px;padding:3px 8px;cursor:pointer;margin-left:6px}
+.izle[aria-pressed="true"]{border-color:var(--yellow);color:var(--yellow);background:rgba(242,210,27,.14)}
 .nb{display:grid;gap:8px;margin-bottom:12px}
 .nbs{background:rgba(232,240,234,.06);border-radius:11px;padding:10px 12px}
 .nbs .u{display:flex;align-items:baseline;gap:8px;justify-content:space-between}
@@ -1817,9 +1820,16 @@ async function apiCanliCek() {
 
 /* ---------- maç nabzı (momentum) ---------- */
 let nabiz = { mac: [], t: 0, not: null, kalan: null }, nabizAcik = false, nabizIs = null;
+let nabizSecim = oku("mb-nabiz", []);                      // elle seçilen maçlar (API id)
+const izlemede = id => nabizSecim.includes(id);
+function izleDegis(id) {
+  nabizSecim = izlemede(id) ? nabizSecim.filter(x => x !== id) : [...nabizSecim, id];
+  yaz("mb-nabiz", nabizSecim);
+}
 async function nabizCek() {
   if (nabizIs) return nabizIs;
-  const ids = (canli && canli.ham ? canli.ham.map(apiBul).filter(Boolean).map(x => x.id) : []).slice(0, 12);
+  const gorunen = (canli && canli.ham ? canli.ham.map(apiBul).filter(Boolean).map(x => x.id) : []);
+  const ids = [...nabizSecim, ...gorunen.filter(x => !nabizSecim.includes(x))].slice(0, 12);
   nabizIs = (async () => {
     try {
       const r = await fetch("/api/nabiz" + (ids.length ? "?ids=" + ids.join(",") : ""), { cache: "no-store" });
@@ -1840,7 +1850,7 @@ function nabizHtml() {
     const sinif = v == null ? "dusuk" : v >= 70 ? "yuksek" : v >= 35 ? "" : "dusuk";
     const f = m.fark;
     return `<div class="nbs ${sinif}">
-      <div class="u"><span class="ad">${esc(m.ev)} - ${esc(m.dep)}</span>
+      <div class="u"><span class="ad">${esc(m.ev)} - ${esc(m.dep)}<button class="izle" data-nb="${m.id}" aria-pressed="${izlemede(m.id)}" title="Nabzını izle">⚡</button></span>
         <span class="deger">${v == null ? "—" : v}</span></div>
       <div class="cubuk"><i style="width:${v == null ? 0 : v}%"></i></div>
       <div class="sag">${m.skor[0]}-${m.skor[1]} · ${m.dk}' · ${esc(m.lig)}</div>
@@ -1851,6 +1861,7 @@ function nabizHtml() {
   }).join("")}</div>
   <div class="alt2" style="font-family:var(--mono);font-size:12px;color:var(--muted);margin:-4px 0 12px">
     ${nabiz.mac.length} maç izleniyor · ${nabiz.aralik ? nabiz.aralik / 60 : 10} dk'da bir ölçüm${nabiz.kalan != null ? ` · bugün kalan istek: ${nabiz.kalan}` : ""}
+    ${nabizSecim.length ? `<br>⚡ ${nabizSecim.length} maç elle seçili — kota önce onlara harcanır. <button class="izle" data-nb="temizle">seçimi temizle</button>` : `<br>Kartlardaki ⚡ ile hangi maçların izleneceğini sen seçebilirsin.`}
   </div>`;
 }
 
@@ -2039,7 +2050,8 @@ function canliKart(m) {
   const skor = a ? `<span class="sk">${a.skor[0]}-${a.skor[1]}</span>` : "";
   const iy = (a && a.iy[0] != null) ? ` · İY ${a.iy[0]}-${a.iy[1]}` : "";
   return `<article class="cm">
-    <div class="ust2"><a href="${tamUrl(m)}" target="_blank" rel="noopener">${esc(m.ev)} - ${esc(m.dep)}</a>${skor}<span class="dk">${d.canliVeri ? `<span class="canliNokta"></span>` : ""}${d.etiket}</span></div>
+    <div class="ust2"><a href="${tamUrl(m)}" target="_blank" rel="noopener">${esc(m.ev)} - ${esc(m.dep)}</a>${skor}<span class="dk">${d.canliVeri ? `<span class="canliNokta"></span>` : ""}${d.etiket}</span>
+      ${a ? `<button class="izle" data-nb="${a.id}" aria-pressed="${izlemede(a.id)}" title="Nabzını izle">⚡</button>` : ""}</div>
     <span class="meta">${esc(ligBilgi(m.url).ulke)} / ${esc(ligBilgi(m.url).lig)} · başlangıç ${trSaat(m.ko)}${iy}</span>
     ${h === undefined ? `<div class="yok2">İstatistikler yükleniyor…</div>`
       : !h ? `<div class="yok2">İstatistik okunamadı.</div>`
@@ -2086,6 +2098,14 @@ function canliCiz() {
 }
 
 $("canli").addEventListener("click", e => {
+  const nbd = e.target.closest("[data-nb]");
+  if (nbd) {
+    if (nbd.dataset.nb === "temizle") nabizSecim = [], yaz("mb-nabiz", nabizSecim);
+    else izleDegis(+nbd.dataset.nb);
+    canliCiz();
+    nabizCek().then(canliCiz);
+    return;
+  }
   if (e.target.id === "cNabiz") {
     nabizAcik = !nabizAcik; canliCiz();
     if (nabizAcik) nabizCek().then(canliCiz);
