@@ -158,11 +158,12 @@ h1{font-size:34px;font-weight:700;letter-spacing:.5px;line-height:1}
 .sirala .bilgi{color:var(--muted);font-size:14px;align-self:center;padding-left:4px;white-space:nowrap}
 .cm .ust2{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
 .cm a{color:var(--chalk);text-decoration:none;font-weight:600;font-size:19px;line-height:1.2}
-.ai{background:rgba(242,210,27,.10);border:1px solid rgba(242,210,27,.35);border-radius:10px;
-  padding:10px 12px;margin:2px 0 10px;font-size:14.5px;line-height:1.55;color:var(--chalk);white-space:pre-wrap}
+.ai{background:#0B2A20;border:1px solid var(--yellow);border-radius:10px;
+  padding:12px 14px;margin:2px 0 10px;font-size:16px;line-height:1.65;color:#FFFFFF;white-space:pre-wrap}
 .ai b{color:var(--yellow)}
-.ai .bas{display:block;font-family:var(--mono);font-size:11.5px;color:var(--yellow);margin-bottom:5px;letter-spacing:.3px}
-.ai .dip{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:7px}
+.ai .bas{display:block;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--yellow);
+  margin-bottom:7px;letter-spacing:.4px}
+.ai .dip{display:block;font-family:var(--mono);font-size:11.5px;color:rgba(255,255,255,.62);margin-top:9px}
 .izle{background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;
   font-family:var(--mono);font-size:12px;padding:3px 8px;cursor:pointer;margin-left:6px}
 .izle[aria-pressed="true"]{border-color:var(--yellow);color:var(--yellow);background:rgba(242,210,27,.14)}
@@ -1858,10 +1859,18 @@ async function aiAnaliz(m) {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(aiVeri(m)),
     });
-    const j = await r.json();
-    aiSonuc[m.url] = j.ok ? { durum: "ok", metin: j.metin, kaynak: j.kaynak, kalan: j.kalan }
-                          : { durum: "hata", metin: j.not || "analiz alınamadı" };
-  } catch (e) { aiSonuc[m.url] = { durum: "hata", metin: "bağlanılamadı" } }
+    const ham = await r.text();
+    let j = null;
+    try { j = JSON.parse(ham) } catch {}
+    if (!j) {                                          // JSON değil: uç nokta yok ya da sunucu hatası
+      aiSonuc[m.url] = { durum: "hata", metin: r.status === 404
+        ? "/api/analiz bulunamadı — dosya deploy edilmemiş"
+        : `sunucu ${r.status}: ${ham.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 120)}` };
+    } else {
+      aiSonuc[m.url] = j.ok ? { durum: "ok", metin: j.metin, kaynak: j.kaynak, kalan: j.kalan }
+                            : { durum: "hata", metin: (j.not || "analiz alınamadı") + ` (${r.status})` };
+    }
+  } catch (e) { aiSonuc[m.url] = { durum: "hata", metin: "ağ hatası: " + (e && e.message ? e.message : e) } }
   aiCiz();
 }
 
