@@ -26,22 +26,32 @@ function govdeOku(req) {
   return {};
 }
 
-/* Modelin onune konan veri: sayilar burada, yorum modelden */
+/* Modelin onune konan veri: pazar secimini KOD yapar, model yalnizca yorumlar */
 function istem(m) {
   const s = [];
   s.push(`Maç: ${kisa(m.ev)} - ${kisa(m.dep)}`);
   if (m.lig) s.push(`Lig: ${kisa(m.ulke)} / ${kisa(m.lig)}`);
   if (m.saat) s.push(`Başlangıç: ${kisa(m.saat)}`);
   if (m.canli) s.push(`CANLI: ${kisa(m.canli)}`);
-  if (m.form) s.push(`Form (son maçlar, G/B/M): ${kisa(m.ev)} ${kisa(m.form[0])} · ${kisa(m.dep)} ${kisa(m.form[1])}`);
-  if (m.yuzde && Object.keys(m.yuzde).length) {
-    s.push("Son 2 ay yüzdeleri (iki takımın ortak oranı):");
-    for (const [k, v] of Object.entries(m.yuzde)) s.push(`  - ${kisa(k)}: %${Math.round(v * 100)}`);
+  if (m.form) s.push(`Form (son maçlar): ${kisa(m.ev)} ${kisa(m.form[0])} · ${kisa(m.dep)} ${kisa(m.form[1])}`);
+
+  const sirali = Object.entries(m.yuzde || {})
+    .filter(([, v]) => typeof v === "number")
+    .sort((a, b) => b[1] - a[1]);
+
+  if (sirali.length) {
+    s.push("");
+    s.push("GOL PAZARLARI — yüzdeye göre sıralı (iki takımın ortak oranı, son 2 ay):");
+    sirali.forEach(([k, v], i) =>
+      s.push(`  ${i + 1}. ${kisa(k)}: %${Math.round(v * 100)}`));
+    s.push("");
+    s.push(`>>> ÖNERİLECEK PAZAR: ${kisa(sirali[0][0])} (%${Math.round(sirali[0][1] * 100)}) <<<`);
+    if (sirali[0][1] < 0.6) s.push(">>> UYARI: en yüksek oran bile %60'ın altında, güvenli bir öneri yok. <<<");
+    const dusuk = sirali.filter(([, v]) => v < 0.35).map(([k]) => k);
+    if (dusuk.length) s.push(`Kaçınılacak (düşük oranlı): ${dusuk.join(", ")}`);
   }
-  if (m.takim) {
-    s.push(`Takım bazında: ${kisa(m.ev)} → ${kisa(m.takim[0])}`);
-    s.push(`               ${kisa(m.dep)} → ${kisa(m.takim[1])}`);
-  }
+
+  if (m.takim) s.push(`Örneklem: ${kisa(m.ev)} ${kisa(m.takim[0])}, ${kisa(m.dep)} ${kisa(m.takim[1])}`);
   if (m.trend && m.trend.length) {
     s.push("Seriler (⇄ = iki takımda birden):");
     for (const t of m.trend.slice(0, 10)) s.push(`  - ${kisa(t)}`);
@@ -50,24 +60,25 @@ function istem(m) {
     s.push("Son maçlar:");
     for (const g of m.sonMac.slice(0, 10)) s.push(`  - ${kisa(g)}`);
   }
-  if (m.ms) s.push(`Sitenin MS tahmini: 1 %${m.ms.e} · X %${m.ms.b} · 2 %${m.ms.d}`);
   return s.join("\n");
 }
 
-const TALIMAT = `Sen bir futbol veri analistisin. Sana bir maçın istatistikleri veriliyor.
+const TALIMAT = `Sen bir futbol veri analistisin. Sana bir maçın gol istatistikleri YÜZDEYE GÖRE SIRALI verilir.
 
-YALNIZCA GOL PAZARLARINI değerlendir: İY 0.5 Üst, İY 1.5 Üst, İY KG, maç 1.5 / 2.5 / 3.5 Üst ve Alt, KG Var/Yok, 2. yarı 0.5 Üst.
-Maç sonucu (1X2), korner, kart, handikap gibi konulara HİÇ girme.
+EN ÖNEMLİ KURAL: Önereceğin pazarı sen seçmezsin. ">>> ÖNERİLECEK PAZAR" satırında yazan pazarı önerirsin. Listede daha aşağıdaki bir pazarı asla öne çıkarma. %60 altındaki hiçbir pazarı önerme.
+
+Yalnızca gol pazarları konuşulur (İY 0.5/1.5 Üst, İY KG, maç 1.5/2.5/3.5 Üst ve Alt, KG Var/Yok, 2. yarı 0.5 Üst). Maç sonucu (1X2), korner, kart, handikap yok.
+
+Biçim:
+1. satır: "Öne çıkan: <pazar> %<oran>" ve tek cümle gerekçe.
+2-4. maddeler (en fazla 3): bu oranı destekleyen seri/form verisi, varsa çelişen veri, ve listenin altındaki hangi pazardan uzak durulmalı.
 
 Kurallar:
-- Türkçe yaz, sade ve kısa. En fazla 110 kelime.
-- İlk satır: verinin en çok desteklediği gol pazarı ve tek cümlelik gerekçesi.
-- Sonra en fazla 3 madde: destekleyen veri, çelişen veri, ve kaçınılması gereken pazar.
-- Her maddede hangi sayıya dayandığını yaz (örn. "İY 0.5Ü %89, 13 maç").
-- Örnek maç sayısı 10'un altındaysa mutlaka belirt; küçük örneklem yanıltır.
-- Yalnızca sana verilen sayıları kullan, sayı UYDURMA.
-- "Kesin", "garanti", "banko" deme. Kupon kurma, oynama tavsiyesi verme.
-- Veri zayıfsa açıkça yaz: "bu veriyle gol tarafında güvenli bir şey söylenemez".`;
+- Türkçe, sade, en fazla 110 kelime.
+- Yalnızca sana verilen sayıları kullan, sayı UYDURMA, yüzdeleri değiştirme.
+- Örneklem 10 maçın altındaysa bunu yaz; küçük örneklem yanıltır.
+- "UYARI: en yüksek oran bile %60'ın altında" satırını görürsen öneri verme, "bu veriyle gol tarafında güvenli bir şey söylenemez" de ve nedenini yaz.
+- "Kesin", "garanti", "banko" deme. Kupon kurma.`;
 
 async function gemini(model, metin) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(KEY)}`;
