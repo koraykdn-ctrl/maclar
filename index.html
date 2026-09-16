@@ -1835,9 +1835,16 @@ function aiVeri(m) {
   if (m.ms) v.ms = m.ms;
   if (h && !h.kismi && h.ev && h.ev.N) {
     const y = {}, ek = (ad, p) => { if (p != null) y[ad] = p };
-    ek("İY 0.5 Üst", havuz(h, "IY05")); ek("İY 1.5 Üst", havuz(h, "IY15")); ek("İY KG~", iyKG(h));
-    ek("1.5 Üst", havuz(h, "O15")); ek("2.5 Üst", havuz(h, "O25")); ek("3.5 Üst", havuz(h, "O35"));
-    ek("KG Var", havuz(h, "KG")); ek("2Y 0.5 Üst~", havuz2Y(h));
+    const ters = p => p == null ? null : 1 - p;
+    const o15 = havuz(h, "O15"), o25 = havuz(h, "O25"), o35 = havuz(h, "O35"),
+          iy15 = havuz(h, "IY15"), kg = havuz(h, "KG");
+    ek("İY 0.5 Üst", havuz(h, "IY05")); ek("İY 1.5 Üst", iy15); ek("İY 1.5 Alt", ters(iy15));
+    ek("İY KG~", iyKG(h));
+    ek("1.5 Üst", o15); ek("1.5 Alt", ters(o15));
+    ek("2.5 Üst", o25); ek("2.5 Alt", ters(o25));
+    ek("3.5 Üst", o35); ek("3.5 Alt", ters(o35));
+    ek("KG Var", kg); ek("KG Yok", ters(kg));
+    ek("2Y 0.5 Üst~", havuz2Y(h));
     v.yuzde = y;
     v.takim = [`${h.ev.N} maç`, `${h.dep.N} maç`];
     if (h.form) v.form = h.form;
