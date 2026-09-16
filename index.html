@@ -1053,25 +1053,18 @@ const SIRALAMA = {
   az:   { ad: "A-Z",  f: (a, b) => (a.ev + " " + a.dep).localeCompare(b.ev + " " + b.dep, "tr") },
   lig:  { ad: "Lig",  f: (a, b) => { const A = ligBilgi(a.url), B = ligBilgi(b.url);
           return (A.buyuk < 0 ? 99 : A.buyuk) - (B.buyuk < 0 ? 99 : B.buyuk) || A.ulke.localeCompare(B.ulke, "tr") || A.lig.localeCompare(B.lig, "tr") || a.ko.localeCompare(b.ko) } },
-  seri: { ad: "Seri", f: (a, b) => seriUzun(b) - seriUzun(a) || a.ko.localeCompare(b.ko) },
-  cift: { ad: "Çift taraflı", f: (a, b) => {
+  IY05: { ad: "İY 0.5 Üst",  p: h => havuz(h, "IY05") },
+  IY15: { ad: "İY 1.5 Üst",  p: h => havuz(h, "IY15") },
+  IYKG: { ad: "İY KG~",      p: h => iyKG(h) },
+  O15:  { ad: "1.5 Üst",     p: h => havuz(h, "O15") },
+  O25:  { ad: "2.5 Üst",     p: h => havuz(h, "O25") },
+  O35:  { ad: "3.5 Üst",     p: h => havuz(h, "O35") },
+  KG:   { ad: "KG Var",      p: h => havuz(h, "KG") },
+  cift: { ad: "⇄ Çift taraflı", f: (a, b) => {
           const A = ciftTarafli(a), B = ciftTarafli(b);
           return (B ? B.n : -1) - (A ? A.n : -1) || a.ko.localeCompare(b.ko) } },
-  IY05: { ad: "İY 0.5 Üst", p: h => havuz(h, "IY05") },
-  IIY05:{ ad: "2Y 0.5 Üst",  p: h => havuz2Y(h) },
-  O15:  { ad: "1.5 Üst",    p: h => havuz(h, "O15") },
-  O25:  { ad: "2.5 Üst",    p: h => havuz(h, "O25") },
-  O35:  { ad: "3.5 Üst",    p: h => havuz(h, "O35") },
-  KG:   { ad: "KG Var",     p: h => havuz(h, "KG") },
-  IYG:  { ad: "İY gol attı", p: h => havuz(h, "IYG") },
-  IIYG: { ad: "2Y gol attı", p: h => havuz(h, "IIYG") },
-  U25:  { ad: "2.5 Alt",    p: h => { const x = havuz(h, "O25"); return x == null ? null : 1 - x } },
-  IY15A:{ ad: "İY 1.5 Alt", p: h => { const x = havuz(h, "IY15"); return x == null ? null : 1 - x } },
-  MS1:  { ad: "Ev kazanır",   f: (a, b) => (b.ms ? b.ms.e : -1) - (a.ms ? a.ms.e : -1) || a.ko.localeCompare(b.ko) },
-  MSX:  { ad: "Beraberlik",   f: (a, b) => (b.ms ? b.ms.b : -1) - (a.ms ? a.ms.b : -1) || a.ko.localeCompare(b.ko) },
-  MS2:  { ad: "Dep. kazanır", f: (a, b) => (b.ms ? b.ms.d : -1) - (a.ms ? a.ms.d : -1) || a.ko.localeCompare(b.ko) },
-  IKIY: { ad: "İki yarı gol", p: h => ikiYariP(h) },
 };
+if (!SIRALAMA[ayar.sira]) { ayar.sira = "saat"; yaz("mb-ayar", ayar) }   // kaldirilan siralama secilirse
 const yuzdeSira = () => !!SIRALAMA[ayar.sira].p;
 
 function siralaCiz(bekleyen) {
@@ -1129,6 +1122,7 @@ function ciz() {
     if (ayar.haric && HARIC.some(h => L.tam.includes(h))) return false;
     if (!q && ayar.buyuk && !ligSecili(L.buyuk)) return false;   // arama sirasinda lig filtresi uygulanmaz
     if (q && !sade(`${m.ev} ${m.dep} ${L.lig} ${L.ulke}`).includes(q)) return false;
+    if (m.canli || Date.parse(m.ko) <= Date.now()) return false;   // başlamış/canlı maçlar Canlı sekmesinde
     if (ayar.veriSuz && !veriVar(m)) return false;
     if (!trendUyar(m)) return false;
     return true;
@@ -1206,6 +1200,7 @@ function macOneri(h) {
   const o25 = havuz(h, "O25");
   ek("İY 0.5 Üst", havuz(h, "IY05"), "İlk yarıda gol olan maç oranı");
   ek("İY 1.5 Üst", havuz(h, "IY15"), "İlk yarıda 2+ gol");
+  ek("İY KG~", iyKG(h), "İki takımın İY gol atma ortalaması (tahmini)");
   ek("1.5 Üst", havuz(h, "O15"), "Maç sonu");
   ek("2.5 Üst", o25, "Maç sonu");
   ek("3.5 Üst", havuz(h, "O35"), "Maç bol gollüyse");
@@ -1244,6 +1239,10 @@ function satirIc(m) {
   return `<span class="tk">${bas}${sat(m.ev, h && h.ev, 0)}${sat(m.dep, h && h.dep, 1)}</span><span class="yz">${msHtml(m)}${yzHtml(m.url)}</span>`;
 }
 
+/* İY KG~ : ev sahibinin ve deplasmanin ilk yarida gol atma oranlarinin
+   (mac sayisina gore agirlikli) ortalamasi. Sitede bu oran yok, tahmindir. */
+const iyKG = h => havuz(h, "IYG");
+
 /* ---------- satirdaki yuzdeler ---------- */
 const havuz = (h, k) => h.ev[k] && h.dep[k] ? (h.ev[k][1] + h.dep[k][1]) / (h.ev.N + h.dep.N) : null;
 /* 2Y 0.5 Ust: site vermiyor, ikinciYari() alt-ust sinirinin ortasi, N agirlikli */
@@ -1264,7 +1263,7 @@ function yzHtml(url) {
   const o25 = havuz(h, "O25"), o35 = havuz(h, "O35"), kg = havuz(h, "KG");
   const g = p => p != null && p >= .7 ? ' class="g"' : "";
   const c = (ad, p) => p == null ? "" : `<span${g(p)}><i>${ad}</i><b>${yz(p)}</b></span>`;
-  return c("İY 0.5Ü", iy) + c("2Y 0.5Ü~", iy2y) + c("1.5Ü", o15)
+  return c("İY 0.5Ü", iy) + c("İY KG~", iyKG(h)) + c("2Y 0.5Ü~", iy2y) + c("1.5Ü", o15)
     + c("2.5Ü", o25) + c("3.5Ü", o35) + c("KG", kg);
 }
 const kuyruk = [], kuyrukta = new Set(), macSite = {}; let calisan = 0;
@@ -1438,10 +1437,11 @@ function detayHtml(m) {
       ${baslik("Yediği gol")}${satir("0.5 Üst", "Y05")}${satir("1.5 Üst", "Y15")}${satir("2.5 Üst", "Y25")}
       ${baslik("Yarılar")}${satir("İY gol attı", "IYG")}${satir("2Y gol attı", "IIYG")}${ikinci}${iki}
       ${baslik("Karşılıklı gol")}${satir("KG Var", "KG")}${satir("KG iki kez", "KG2")}
+      ${(() => { const o = iyKG(h); return o == null ? "" : `<tr><td>${hucre(h.ev.IYG, h.ev.N)}</td><td>İY KG~***<span class="ort${o >= .7 ? " g" : ""}">%${Math.round(o * 100)}</span></td><td>${hucre(h.dep.IYG, h.dep.N)}</td></tr>` })()}
       ${baslik("Farklı galibiyet")}${satir("2+ farkla kazandı", "F1")}${satir("3+ farkla kazandı", "F2")}
       ${baslik("Alt (hesaplanan)")}${altSat("2.5 Alt", "O25")}${altSat("3.5 Alt", "O35")}${altSat("İY 1.5 Alt", "IY15")}
     </table>
-    <p class="yok" style="font-size:11.5px;line-height:1.4">Ortadaki koyu yüzde, iki takımın birlikte ortalamasıdır (maç sayısına göre ağırlıklı: toplam isabet / toplam maç); %70 ve üstü sarı.<br>* Site ikinci yarı 0.5 Üst oranını vermiyor. Bu aralık sitenin maç ve ilk yarı gol sayılarından kesin olarak hesaplanır: en az = ikinci yarıda gol olmak zorunda olan maçlar, en fazla = golsüz bitmeyen maçlar.<br>** Sitede yok; yarıların birbirinden bağımsız olduğu varsayımıyla ilk yarı ve maç gol oranlarından tahmin edilir.</p>`;
+    <p class="yok" style="font-size:11.5px;line-height:1.4">Ortadaki koyu yüzde, iki takımın birlikte ortalamasıdır (maç sayısına göre ağırlıklı: toplam isabet / toplam maç); %70 ve üstü sarı.<br>* Site ikinci yarı 0.5 Üst oranını vermiyor. Bu aralık sitenin maç ve ilk yarı gol sayılarından kesin olarak hesaplanır: en az = ikinci yarıda gol olmak zorunda olan maçlar, en fazla = golsüz bitmeyen maçlar.<br>** Sitede yok; yarıların birbirinden bağımsız olduğu varsayımıyla ilk yarı ve maç gol oranlarından tahmin edilir.<br>*** İY KG~ = iki takımın ilk yarıda gol atma oranlarının ortalaması. Kaba bir göstergedir: gerçek “ilk yarı karşılıklı gol” oranı bu iki orandan düşük olanı aşamaz.</p>`;
   }
   const L = ligBilgi(m.url);
   const genel = `<h3>Genel</h3><ul><li>Başlangıç <b>${trSaat(m.ko)}</b> · ${trTarih(m.ko).split("-").reverse().join(".")}</li>
@@ -1517,6 +1517,7 @@ function suzulmus() {
     if (ayar.haric && HARIC.some(h => L.tam.includes(h))) return false;
     if (!q && ayar.buyuk && !ligSecili(L.buyuk)) return false;
     if (q && !sade(`${m.ev} ${m.dep} ${L.lig} ${L.ulke}`).includes(q)) return false;
+    if (m.canli || Date.parse(m.ko) <= Date.now()) return false;   // başlamış maçlar kupona girmez
     if (ayar.veriSuz && !veriVar(m)) return false;
     return true;
   });
