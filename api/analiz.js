@@ -13,7 +13,7 @@
 const { acik: kvAcik, kvOku, kvYaz } = require("./_kv.js");
 
 const KEY = process.env.GEMINI_KEY || process.env.GOOGLE_API_KEY || "";
-const MODELLER = [process.env.GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.0-flash"].filter(Boolean);
+const MODELLER = [process.env.GEMINI_MODEL, "gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest"].filter(Boolean);
 const GUNLUK = 120;                       // gunluk analiz tavani
 const OMUR = 3600;                        // ayni mac icin onbellek (saniye)
 
