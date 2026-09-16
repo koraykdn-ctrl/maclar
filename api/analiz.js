@@ -88,7 +88,8 @@ async function gemini(model, metin) {
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: TALIMAT }] },
       contents: [{ role: "user", parts: [{ text: metin }] }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 400 },
+      // Yeni Gemini surumleri cevaptan once "dusunme" tokeni harcar; butce genis tutulur
+      generationConfig: { temperature: 0.4, maxOutputTokens: 4096 },
     }),
     signal: AbortSignal.timeout(20000),
   });
@@ -98,8 +99,14 @@ async function gemini(model, metin) {
     e.kod = r.status;
     throw e;
   }
-  const p = ((j.candidates || [])[0] || {}).content || {};
-  return ((p.parts || []).map(x => x.text || "").join("").trim()) || "";
+  const c = (j.candidates || [])[0] || {};
+  const cikti = (((c.content || {}).parts || []).map(x => x.text || "").join("").trim()) || "";
+  if (!cikti && c.finishReason) {
+    const e = new Error("model yanıtı boş (" + c.finishReason + ")");
+    e.kod = 500;
+    throw e;
+  }
+  return cikti;
 }
 
 module.exports = async (req, res) => {
