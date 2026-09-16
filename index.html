@@ -158,6 +158,11 @@ h1{font-size:34px;font-weight:700;letter-spacing:.5px;line-height:1}
 .sirala .bilgi{color:var(--muted);font-size:14px;align-self:center;padding-left:4px;white-space:nowrap}
 .cm .ust2{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
 .cm a{color:var(--chalk);text-decoration:none;font-weight:600;font-size:19px;line-height:1.2}
+.ai{background:rgba(242,210,27,.10);border:1px solid rgba(242,210,27,.35);border-radius:10px;
+  padding:10px 12px;margin:2px 0 10px;font-size:14.5px;line-height:1.55;color:var(--chalk);white-space:pre-wrap}
+.ai b{color:var(--yellow)}
+.ai .bas{display:block;font-family:var(--mono);font-size:11.5px;color:var(--yellow);margin-bottom:5px;letter-spacing:.3px}
+.ai .dip{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:7px}
 .izle{background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;
   font-family:var(--mono);font-size:12px;padding:3px 8px;cursor:pointer;margin-left:6px}
 .izle[aria-pressed="true"]{border-color:var(--yellow);color:var(--yellow);background:rgba(242,210,27,.14)}
@@ -211,6 +216,7 @@ h1{font-size:34px;font-weight:700;letter-spacing:.5px;line-height:1}
 .trd span.c{border-color:var(--yellow);background:rgba(242,210,27,.14);color:var(--yellow)}
 .trd span.c b{color:var(--yellow)}
 .trd span i{font-style:normal;opacity:.75;margin-right:3px}
+.rozet.ai-dug{border:1px solid rgba(242,210,27,.45);color:var(--yellow);cursor:pointer}
 .cm .seri2{margin-top:8px;font-size:13.5px;color:var(--muted);line-height:1.4}
 .cm .yok2{font-size:14px;color:var(--muted)}
 .bas2 .yok2{display:block;margin:2px 0 8px}
@@ -1185,7 +1191,7 @@ function macHtml(m) {
     <button class="bas2" data-mac="${esc(m.url)}" aria-expanded="${acik}">
       <span class="ust2"><span style="font-weight:600;font-size:19px;line-height:1.2">${esc(m.ev)} - ${esc(m.dep)}</span>
         <span class="dk" style="color:${m.canli ? "var(--red)" : "var(--muted)"}">${m.canli ? "CANLI" : trSaat(m.ko)}</span></span>
-      <span class="meta">${esc(L.ulke)} / ${esc(L.lig)}${seri ? `<span class="rozet">${seri} seri</span>` : ""}${ct ? `<span class="rozet cift">⇄ ${ciftTrend(m).length} çift taraflı</span>` : ""}</span>
+      <span class="meta">${esc(L.ulke)} / ${esc(L.lig)}${seri ? `<span class="rozet">${seri} seri</span>` : ""}${ct ? `<span class="rozet cift">⇄ ${ciftTrend(m).length} çift taraflı</span>` : ""}<span class="rozet ai-dug" data-ai="${esc(m.url)}">🧠 analiz</span></span>
       <span data-trd="${esc(m.url)}">${trendHtml(m, 5)}</span>
       <span class="govde" data-yz="${esc(m.url)}">${kartIc(m)}</span>
     </button>
@@ -1473,7 +1479,7 @@ function detayHtml(m) {
   const seriler = t.filter(b => b.yuzde == null);
   const yuzdeler = t.filter(b => b.yuzde != null);
   const yan = o => o.cift ? "⇄" : trendTaraf(m, o.takimlar[0]);
-  return genel + sonMaclarHtml(h, m) + ust + msSatir
+  return aiHtml(m.url) + genel + sonMaclarHtml(h, m) + ust + msSatir
     + (seriler.length ? `<h3>Trendler</h3><ul>${seriler.map(b => `<li><b>${yan(b)}</b> ${esc(b.takimlar.join(" / "))} · ${esc(trCevir(b.ifade))} · son ${b.n} maç</li>`).join("")}</ul>` : "")
     + (yuzdeler.length ? `<h3>Öne çıkan oranlar</h3><ul>${yuzdeler.map(b => `<li><b>${yan(b)}</b> ${esc(b.takimlar.join(" / "))} · ${esc(trCevir(b.ifade))} · %${b.yuzde} (${b.n} maç)</li>`).join("")}</ul>` : "")
     + `<a class="site" href="${tamUrl(m)}" target="_blank" rel="noopener">Sitede aç ↗</a>`;
@@ -1818,6 +1824,60 @@ async function apiCanliCek() {
   } catch (e) { apiCanli = { mac: [], t: Date.now(), not: "bağlanılamadı" } }
 }
 
+/* ---------- yapay zekâ analizi (Gemini) ---------- */
+const aiSonuc = {};                                   // url -> {durum:"bekle"|"ok"|"hata", metin}
+
+function aiVeri(m) {
+  const h = h2hBellek[m.url], L = ligBilgi(m.url), a = apiBul(m);
+  const v = { url: m.url, ev: m.ev, dep: m.dep, ulke: L.ulke, lig: L.lig, saat: trSaat(m.ko) };
+  if (a) v.canli = `${a.skor[0]}-${a.skor[1]}, ${a.dk || "?"}. dakika${a.iy[0] != null ? `, İY ${a.iy[0]}-${a.iy[1]}` : ""}`;
+  if (m.ms) v.ms = m.ms;
+  if (h && !h.kismi && h.ev && h.ev.N) {
+    const y = {}, ek = (ad, p) => { if (p != null) y[ad] = p };
+    ek("İY 0.5 Üst", havuz(h, "IY05")); ek("İY 1.5 Üst", havuz(h, "IY15")); ek("İY KG~", iyKG(h));
+    ek("1.5 Üst", havuz(h, "O15")); ek("2.5 Üst", havuz(h, "O25")); ek("3.5 Üst", havuz(h, "O35"));
+    ek("KG Var", havuz(h, "KG")); ek("2Y 0.5 Üst~", havuz2Y(h));
+    v.yuzde = y;
+    v.takim = [`${h.ev.N} maç`, `${h.dep.N} maç`];
+    if (h.form) v.form = h.form;
+    if (h.maclar) v.sonMac = [...(h.maclar[0] || []), ...(h.maclar[1] || [])]
+      .slice(0, 10).map(g => `${g.t} ${g.ev} ${g.s} ${g.dep} (İY ${g.iy})`);
+  }
+  const t = trendler(m);
+  if (t.length) v.trend = t.slice(0, 10).map(o =>
+    `${o.cift ? "⇄ iki takım" : o.takimlar[0]}: ${trCevir(o.ifade)}${o.yuzde != null ? ` %${o.yuzde}` : ` (son ${o.n} maç)`}`);
+  return v;
+}
+
+async function aiAnaliz(m) {
+  if (aiSonuc[m.url] && aiSonuc[m.url].durum === "bekle") return;
+  aiSonuc[m.url] = { durum: "bekle" };
+  aiCiz();
+  try {
+    const r = await fetch("/api/analiz", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(aiVeri(m)),
+    });
+    const j = await r.json();
+    aiSonuc[m.url] = j.ok ? { durum: "ok", metin: j.metin, kaynak: j.kaynak, kalan: j.kalan }
+                          : { durum: "hata", metin: j.not || "analiz alınamadı" };
+  } catch (e) { aiSonuc[m.url] = { durum: "hata", metin: "bağlanılamadı" } }
+  aiCiz();
+}
+
+function aiHtml(url) {
+  const a = aiSonuc[url];
+  if (!a) return "";
+  if (a.durum === "bekle") return `<div class="ai"><span class="bas">🧠 ANALİZ</span>Okunuyor…</div>`;
+  if (a.durum === "hata") return `<div class="ai"><span class="bas">🧠 ANALİZ</span>Alınamadı: ${esc(a.metin)}</div>`;
+  return `<div class="ai"><span class="bas">🧠 ANALİZ</span>${esc(a.metin)}<span class="dip">Yapay zekâ yorumu — sayılar uygulamadan, yorum modelden.${a.kalan != null ? ` Bugün kalan: ${a.kalan}` : ""}</span></div>`;
+}
+
+function aiCiz() {                                    // açık kart ve canlı listeyi tazele
+  if (acikMac) { const d = $("detay"); if (d && veri) { const m = veri.maclar.find(x => x.url === acikMac); if (m) d.innerHTML = detayHtml(m) } }
+  if (ana === "canli") canliCiz();
+}
+
 /* ---------- maç nabzı (momentum) ---------- */
 let nabiz = { mac: [], t: 0, not: null, kalan: null }, nabizAcik = false, nabizIs = null;
 let nabizSecim = oku("mb-nabiz", []);                      // elle seçilen maçlar (API id)
@@ -2051,7 +2111,8 @@ function canliKart(m) {
   const iy = (a && a.iy[0] != null) ? ` · İY ${a.iy[0]}-${a.iy[1]}` : "";
   return `<article class="cm">
     <div class="ust2"><a href="${tamUrl(m)}" target="_blank" rel="noopener">${esc(m.ev)} - ${esc(m.dep)}</a>${skor}<span class="dk">${d.canliVeri ? `<span class="canliNokta"></span>` : ""}${d.etiket}</span>
-      ${a ? `<button class="izle" data-nb="${a.id}" aria-pressed="${izlemede(a.id)}" title="Nabzını izle">⚡</button>` : ""}</div>
+      ${a ? `<button class="izle" data-nb="${a.id}" aria-pressed="${izlemede(a.id)}" title="Nabzını izle">⚡</button>` : ""}
+      <button class="izle" data-ai="${esc(m.url)}" title="Yapay zekâ analizi">🧠</button></div>
     <span class="meta">${esc(ligBilgi(m.url).ulke)} / ${esc(ligBilgi(m.url).lig)} · başlangıç ${trSaat(m.ko)}${iy}</span>
     ${h === undefined ? `<div class="yok2">İstatistikler yükleniyor…</div>`
       : !h ? `<div class="yok2">İstatistik okunamadı.</div>`
@@ -2060,6 +2121,7 @@ function canliKart(m) {
           + o.map(x => `<div class="o${x.p >= .7 ? " iyi" : ""}"><b>${esc(x.ad)}</b><span class="p">${yz(x.p)}</span><small>${esc(x.not)}</small></div>`).join("")}</div>`
       : `<div class="yok2">Bu aşama için öneri yok.</div>`}
     ${seri || ""}
+    ${aiHtml(m.url)}
   </article>`;
 }
 
@@ -2098,6 +2160,12 @@ function canliCiz() {
 }
 
 $("canli").addEventListener("click", e => {
+  const aid = e.target.closest("[data-ai]");
+  if (aid && canli && canli.ham) {
+    const m = canli.ham.find(x => x.url === aid.dataset.ai);
+    if (m) aiAnaliz(m);
+    return;
+  }
   const nbd = e.target.closest("[data-nb]");
   if (nbd) {
     if (nbd.dataset.nb === "temizle") nabizSecim = [], yaz("mb-nabiz", nabizSecim);
@@ -2117,6 +2185,13 @@ $("canli").addEventListener("click", e => {
 });
 $("guncelle").onclick = () => { if (ana === "canli") canliYukle(); else yukle(true) };
 $("liste").addEventListener("click", e => {
+  const aid = e.target.closest("[data-ai]");
+  if (aid && veri) {
+    const m = veri.maclar.find(x => x.url === aid.dataset.ai);
+    if (m) { if (acikMac !== m.url) { acikMac = m.url; ciz() } aiAnaliz(m) }
+    e.stopPropagation();
+    return;
+  }
   if (e.target.id === "cYenile") yukle(true);
   if (e.target.id === "cTest") baglantiTesti();
 });
