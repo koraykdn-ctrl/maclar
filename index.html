@@ -158,6 +158,25 @@ h1{font-size:34px;font-weight:700;letter-spacing:.5px;line-height:1}
 .sirala .bilgi{color:var(--muted);font-size:14px;align-self:center;padding-left:4px;white-space:nowrap}
 .cm .ust2{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
 .cm a{color:var(--chalk);text-decoration:none;font-weight:600;font-size:19px;line-height:1.2}
+.nb{display:grid;gap:8px;margin-bottom:12px}
+.nbs{background:rgba(232,240,234,.06);border-radius:11px;padding:10px 12px}
+.nbs .u{display:flex;align-items:baseline;gap:8px;justify-content:space-between}
+.nbs .ad{font-size:16px;font-weight:600;color:var(--chalk)}
+.nbs .sag{font-family:var(--mono);font-size:13px;color:var(--muted);white-space:nowrap}
+.nbs .cubuk{height:7px;border-radius:4px;background:rgba(255,255,255,.1);margin:7px 0 5px;overflow:hidden}
+.nbs .cubuk i{display:block;height:100%;background:var(--yellow);border-radius:4px}
+.nbs.dusuk .cubuk i{background:var(--muted)}
+.nbs.yuksek .cubuk i{background:var(--red)}
+.nbs .alt{font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.5}
+.nbs .deger{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--yellow)}
+.nbs.yuksek .deger{color:var(--red)}
+.nbs.dusuk .deger{color:var(--muted)}
+.cm .sk{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--chalk);margin-left:8px}
+.cm .canliNokta{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:5px;
+  animation:atis 1.6s ease-in-out infinite}
+@keyframes atis{0%,100%{opacity:1}50%{opacity:.25}}
+.cm .oldu{background:rgba(30,138,76,.18);border:1px solid var(--pos)}
+.cm .oldu .p{color:var(--pos)}
 .cm .dk{font-family:var(--mono);font-size:14px;color:var(--red);font-weight:600;white-space:nowrap}
 .cm .meta{display:block;font-size:14px;color:var(--muted);margin:2px 0 8px;text-transform:capitalize}
 .oneri{display:grid;gap:6px}
@@ -1785,6 +1804,70 @@ $("tarama").addEventListener("change", e => {
 /* =================== CANLI =================== */
 let canli = null, canliYukleniyor = false, canliSayac = null;
 
+/* ---------- canlı skor/dakika (API-Football, sunucu üzerinden) ---------- */
+let apiCanli = { mac: [], t: 0, not: null };
+async function apiCanliCek() {
+  try {
+    const r = await fetch("/api/canli", { cache: "no-store" });
+    if (!r.ok) throw new Error("http " + r.status);
+    const j = await r.json();
+    apiCanli = { mac: Array.isArray(j.mac) ? j.mac : [], t: Date.now(), not: j.ok ? null : (j.not || "veri yok"), yas: j.yas, kaynak: j.kaynak };
+  } catch (e) { apiCanli = { mac: [], t: Date.now(), not: "bağlanılamadı" } }
+}
+
+/* ---------- maç nabzı (momentum) ---------- */
+let nabiz = { mac: [], t: 0, not: null, kalan: null }, nabizAcik = false, nabizIs = null;
+async function nabizCek() {
+  if (nabizIs) return nabizIs;
+  const ids = (canli && canli.ham ? canli.ham.map(apiBul).filter(Boolean).map(x => x.id) : []).slice(0, 12);
+  nabizIs = (async () => {
+    try {
+      const r = await fetch("/api/nabiz" + (ids.length ? "?ids=" + ids.join(",") : ""), { cache: "no-store" });
+      const j = await r.json();
+      nabiz = { mac: Array.isArray(j.mac) ? j.mac : [], t: Date.now(), not: j.ok ? null : (j.not || "veri yok"), kalan: j.kalan, aralik: j.aralik };
+    } catch (e) { nabiz = { mac: [], t: Date.now(), not: "bağlanılamadı" } }
+    nabizIs = null;
+  })();
+  return nabizIs;
+}
+
+function nabizHtml() {
+  if (nabiz.not) return `<div class="bos">Nabız alınamadı: ${esc(nabiz.not)}</div>`;
+  if (!nabiz.mac.length) return `<div class="bos">Şu an izlenecek canlı maç yok.</div>`;
+  const ok = y => y === "ev" ? "◄ ev" : y === "dep" ? "dep ►" : "denge";
+  return `<div class="nb">${nabiz.mac.map(m => {
+    const v = m.nabiz;
+    const sinif = v == null ? "dusuk" : v >= 70 ? "yuksek" : v >= 35 ? "" : "dusuk";
+    const f = m.fark;
+    return `<div class="nbs ${sinif}">
+      <div class="u"><span class="ad">${esc(m.ev)} - ${esc(m.dep)}</span>
+        <span class="deger">${v == null ? "—" : v}</span></div>
+      <div class="cubuk"><i style="width:${v == null ? 0 : v}%"></i></div>
+      <div class="sag">${m.skor[0]}-${m.skor[1]} · ${m.dk}' · ${esc(m.lig)}</div>
+      <div class="alt">${v == null ? "ölçülüyor — ikinci okuma bekleniyor"
+        : `${ok(m.yon)} · son ${f ? f.dk : "?"} dk: şut ${f ? f.ev.sut : 0}-${f ? f.dep.sut : 0} · isabet ${f ? f.ev.isabet : 0}-${f ? f.dep.isabet : 0} · korner ${f ? f.ev.korner : 0}-${f ? f.dep.korner : 0}`}
+      </div>
+    </div>`;
+  }).join("")}</div>
+  <div class="alt2" style="font-family:var(--mono);font-size:12px;color:var(--muted);margin:-4px 0 12px">
+    ${nabiz.mac.length} maç izleniyor · ${nabiz.aralik ? nabiz.aralik / 60 : 10} dk'da bir ölçüm${nabiz.kalan != null ? ` · bugün kalan istek: ${nabiz.kalan}` : ""}
+  </div>`;
+}
+
+/* Takım adları iki kaynakta birebir aynı olmuyor: sadeleştirip parça eşleşmesi arıyoruz */
+const adParca = x => sade(x).split(/[^a-z0-9]+/).filter(w => w.length > 3);
+function adBenzer(a, b) {
+  const A = sade(a), B = sade(b);
+  if (!A || !B) return false;
+  if (A === B || A.includes(B) || B.includes(A)) return true;
+  const pa = adParca(a), pb = adParca(b);
+  return pa.some(w => pb.includes(w));
+}
+function apiBul(m) {
+  if (!apiCanli.mac.length) return null;
+  return apiCanli.mac.find(x => adBenzer(x.ev, m.ev) && adBenzer(x.dep, m.dep)) || null;
+}
+
 function canliOku(html, site = "fz") {
   const liste = [];
   for (const parca of html.split(/<tr[\s>]/i).slice(1)) {
@@ -1839,7 +1922,15 @@ function canliOku2(html, site = "fz") {
 }
 
 /* kickoff'tan tahmini dakika (site skor/dakika vermiyor) */
-function dakika(ko) {
+function dakika(ko, a) {
+  if (a && a.durum) {                                   // API-Football'dan gerçek dakika
+    const dk = (a.dk || 0) + (a.ek || 0);
+    if (a.durum === "HT" || a.durum === "BT") return { gecen: 45, mac: 45, etiket: "devre arası", faz: 2, canliVeri: true };
+    if (a.durum === "1H") return { gecen: dk, mac: dk, etiket: `${dk}'`, faz: dk < 1 ? 0 : 1, canliVeri: true };
+    if (a.durum === "2H" || a.durum === "ET" || a.durum === "P")
+      return { gecen: dk, mac: dk, etiket: `${dk}'`, faz: dk < 75 ? 3 : 4, canliVeri: true };
+    return { gecen: dk, mac: dk, etiket: `${dk}'`, faz: 3, canliVeri: true };
+  }
   const gecen = Math.floor((Date.now() - Date.parse(ko)) / 60000);
   if (gecen < 0) return { gecen, etiket: "başlamak üzere", faz: 0 };
   if (gecen <= 45) return { gecen, mac: gecen, etiket: `~${gecen}'`, faz: 1 };
@@ -1848,13 +1939,27 @@ function dakika(ko) {
   return { gecen, mac, etiket: `~${mac}'`, faz: mac < 75 ? 3 : 4 };
 }
 
-function canliOneri(h, d) {
+function canliOneri(h, d, a) {
   if (!h) return [];
   const o = [];
+  /* Skor biliniyorsa sonuçlanmış pazarı önermek anlamsız: onları "oldu" olarak işaretle */
+  const toplam = a ? a.skor[0] + a.skor[1] : null;
+  const iyT = (a && a.iy[0] != null) ? a.iy[0] + a.iy[1] : null;
+  const ikiYariGol = (a && iyT != null) ? (toplam - iyT) : null;
+  const oldu = [];
   const iy05 = havuz(h, "IY05"), iy15 = havuz(h, "IY15"), o25 = havuz(h, "O25"), o35 = havuz(h, "O35"), kg = havuz(h, "KG");
   const iki = ikiYariP(h);
   const y2 = (() => { const a = ikinciYari(h.ev), b = ikinciYari(h.dep); return a && b ? (a[0] * h.ev.N + b[0] * h.dep.N) / (h.ev.N + h.dep.N) : null })();
   const ek = (ad, p, not) => { if (p != null) o.push({ ad, p, not }) };
+  if (toplam != null) {                                  // gerçekleşenler
+    if (iyT != null && iyT > 0) oldu.push({ ad: "İY 0.5 Üst", not: `ilk yarı ${a.iy[0]}-${a.iy[1]} bitti` });
+    if (iyT != null && iyT > 1) oldu.push({ ad: "İY 1.5 Üst", not: `ilk yarı ${a.iy[0]}-${a.iy[1]} bitti` });
+    if (ikiYariGol != null && ikiYariGol > 0) oldu.push({ ad: "2. yarı 0.5 Üst", not: "ikinci yarıda gol oldu" });
+    if (toplam > 1) oldu.push({ ad: "1.5 Üst", not: `skor ${a.skor[0]}-${a.skor[1]}` });
+    if (toplam > 2) oldu.push({ ad: "2.5 Üst", not: `skor ${a.skor[0]}-${a.skor[1]}` });
+    if (toplam > 3) oldu.push({ ad: "3.5 Üst", not: `skor ${a.skor[0]}-${a.skor[1]}` });
+    if (a.skor[0] > 0 && a.skor[1] > 0) oldu.push({ ad: "KG Var", not: "iki takım da attı" });
+  }
   if (d.faz <= 1) {
     ek("İY 0.5 Üst", iy05, "İlk yarıda gol olan maç oranı");
     ek("İY 1.5 Üst", iy15, "İlk yarıda 2+ gol olan maç oranı");
@@ -1871,12 +1976,15 @@ function canliOneri(h, d) {
     ek("KG Var", kg, "Maç sonu");
   }
   if (d.faz === 4) ek("2. yarı 0.5 Üst", y2, "Son bölüm — oranlar yüksek, risk de yüksek");
-  return o.sort((a, b) => b.p - a.p).slice(0, 3);
+  const bitmis = new Set(oldu.map(x => x.ad));
+  const kalan = o.filter(x => !bitmis.has(x.ad)).sort((x, y) => y.p - x.p).slice(0, 3);
+  return { oneri: kalan, oldu: oldu.slice(0, 3) };
 }
 
 async function canliYukle() {
   if (canliYukleniyor) return;
   canliYukleniyor = true; canliCiz();
+  const apiIs = apiCanliCek();                                       // canlı skorlar paralel gelsin
   const canliListesi = (r, site) => {
     if (!r) return [];
     let l = canliOku(r.html, site);                                  // 1) tablo
@@ -1893,6 +2001,7 @@ async function canliYukle() {
     h2 = await sayfa(CANLI_YOL2, "afr", true, macVar);
     for (const m of canliListesi(h2, "afr")) if (!harita.has(macAnahtar(m))) harita.set(macAnahtar(m), m);
   }
+  await apiIs;
   canliYukleniyor = false;
   const rapor = (h1 && h1.deneme) || (h2 && h2.deneme) || sonDeneme;
   if (!h1 && !h2) { canli = { hata: true, tani: rapor }; canliCiz(); return }
@@ -1901,13 +2010,18 @@ async function canliYukle() {
   canliCiz();
   yzIste(canliListe());
   clearInterval(canliSayac);
-  canliSayac = setInterval(() => { if (ana === "canli") canliCiz(); else clearInterval(canliSayac) }, 30000);
+  canliSayac = setInterval(async () => {
+    if (ana !== "canli") { clearInterval(canliSayac); return }
+    await apiCanliCek();                                             // sunucu 90 sn önbellekli
+    if (nabizAcik) await nabizCek();                                 // sunucu 10 dk aralığı uygular
+    canliCiz();
+  }, 30000);
 }
 
 let canliFiltresiz = false;
 function canliListe() {
   if (!canli || !canli.ham) return [];
-  let liste = canli.ham.filter(m => dakika(m.ko).gecen < 180);   // 3 saati gecenler bitmis sayilir
+  let liste = canli.ham.filter(m => dakika(m.ko, apiBul(m)).gecen < 180);   // 3 saati gecenler bitmis sayilir
   if (!canliFiltresiz) {
     if (ayar.haric) liste = liste.filter(m => !HARIC.some(h => ligBilgi(m.url).tam.includes(h)));
     if (ayar.buyuk) liste = liste.filter(m => ligSecili(ligBilgi(m.url).buyuk));
@@ -1918,14 +2032,20 @@ function canliListe() {
 }
 
 function canliKart(m) {
-  const d = dakika(m.ko), h = h2hBellek[m.url], o = canliOneri(h, d);
+  const a = apiBul(m);
+  const d = dakika(m.ko, a), h = h2hBellek[m.url];
+  const r = canliOneri(h, d, a), o = r.oneri || [], oldu = r.oldu || [];
   const seri = trendHtml(m, 6);
+  const skor = a ? `<span class="sk">${a.skor[0]}-${a.skor[1]}</span>` : "";
+  const iy = (a && a.iy[0] != null) ? ` · İY ${a.iy[0]}-${a.iy[1]}` : "";
   return `<article class="cm">
-    <div class="ust2"><a href="${tamUrl(m)}" target="_blank" rel="noopener">${esc(m.ev)} - ${esc(m.dep)}</a><span class="dk">${d.etiket}</span></div>
-    <span class="meta">${esc(ligBilgi(m.url).ulke)} / ${esc(ligBilgi(m.url).lig)} · başlangıç ${trSaat(m.ko)}</span>
+    <div class="ust2"><a href="${tamUrl(m)}" target="_blank" rel="noopener">${esc(m.ev)} - ${esc(m.dep)}</a>${skor}<span class="dk">${d.canliVeri ? `<span class="canliNokta"></span>` : ""}${d.etiket}</span></div>
+    <span class="meta">${esc(ligBilgi(m.url).ulke)} / ${esc(ligBilgi(m.url).lig)} · başlangıç ${trSaat(m.ko)}${iy}</span>
     ${h === undefined ? `<div class="yok2">İstatistikler yükleniyor…</div>`
       : !h ? `<div class="yok2">İstatistik okunamadı.</div>`
-      : o.length ? `<div class="oneri">${o.map(x => `<div class="o${x.p >= .7 ? " iyi" : ""}"><b>${esc(x.ad)}</b><span class="p">${yz(x.p)}</span><small>${esc(x.not)}</small></div>`).join("")}</div>`
+      : (o.length || oldu.length) ? `<div class="oneri">${
+          oldu.map(x => `<div class="o oldu"><b>${esc(x.ad)}</b><span class="p">✓</span><small>${esc(x.not)}</small></div>`).join("")
+          + o.map(x => `<div class="o${x.p >= .7 ? " iyi" : ""}"><b>${esc(x.ad)}</b><span class="p">${yz(x.p)}</span><small>${esc(x.not)}</small></div>`).join("")}</div>`
       : `<div class="yok2">Bu aşama için öneri yok.</div>`}
     ${seri || ""}
   </article>`;
@@ -1941,23 +2061,37 @@ function taniHtml(c) {
 function canliCiz() {
   const el = $("canli");
   const liste = canliListe();
-  const toplamHam = canli && canli.ham ? canli.ham.filter(m => dakika(m.ko).gecen < 180).length : 0;
+  const toplamHam = canli && canli.ham ? canli.ham.filter(m => dakika(m.ko, apiBul(m)).gecen < 180).length : 0;
+  const apiDurum = apiCanli.mac.length
+    ? `<span class="rozet">canlı skor açık · ${apiCanli.mac.length} maç</span>`
+    : (apiCanli.not ? `<span class="rozet">canlı skor yok (${esc(apiCanli.not)})</span>` : "");
   $("durum").textContent = canli && canli.ham ? `${canliListe().length} canlı maç` : "";
-  const bas = `<div class="canli-uyari"><b>Skor bilgisi yok.</b> Site canlı skoru ve dakikayı vermiyor; dakika başlangıç saatinden tahmin edilir, yüzdeler ise maç öncesi son 2 ay istatistikleridir. Öneriler skoru <b>bilmeden</b> hesaplanır — bahis oynamadan önce maçın gerçek skoruna ve dakikasına kendin bak; pazar çoktan kapanmış olabilir.</div>`
+  const uyari = apiCanli.mac.length
+    ? `<div class="canli-uyari">Skor ve dakika canlı veriden geliyor; ✓ işaretli pazarlar <b>gerçekleşmiş</b> olanlardır. Yüzdeler yine maç öncesi son 2 ay istatistiğidir, anlık oyunu ölçmez. Eşleşmeyen maçlarda dakika hâlâ tahminidir (~).</div>`
+    : `<div class="canli-uyari"><b>Skor bilgisi yok.</b> Site canlı skoru ve dakikayı vermiyor; dakika başlangıç saatinden tahmin edilir, yüzdeler ise maç öncesi son 2 ay istatistikleridir. Öneriler skoru <b>bilmeden</b> hesaplanır — bahis oynamadan önce maçın gerçek skoruna ve dakikasına kendin bak; pazar çoktan kapanmış olabilir.</div>`;
+  const bas = uyari
     + `<div class="durum">${canli && canli.ham ? `${liste.length} canlı maç${toplamHam > liste.length ? ` (${toplamHam} maçtan)` : ""} · ${trSaat(new Date(canli.t).toISOString())} güncellendi` : ""}
         <button class="yenile" id="cYenile" ${canliYukleniyor ? "disabled" : ""}>${canliYukleniyor ? "Yükleniyor…" : "Yenile"}</button>
-        ${canli && canli.ham && toplamHam > liste.length ? `<button class="yenile" id="cHepsi">${canliFiltresiz ? "Filtreleri uygula" : "Filtresiz göster"}</button>` : ""}</div>`;
+        ${canli && canli.ham && toplamHam > liste.length ? `<button class="yenile" id="cHepsi">${canliFiltresiz ? "Filtreleri uygula" : "Filtresiz göster"}</button>` : ""}
+        <button class="yenile" id="cNabiz" aria-pressed="${nabizAcik}">${nabizAcik ? "Maç listesi" : "⚡ Nabız"}</button>
+        ${apiDurum}</div>`;
   let ic = "";
   if (canliYukleniyor && !canli) ic = `<div class="bos">Canlı maçlar yükleniyor…</div>`;
   else if (canli && canli.hata) ic = `<div class="bos"><b>Canlı sayfası açılamadı.</b><br>Birkaç dakika sonra yenile.${taniHtml(canli)}<br><br><button class="yenile" id="cTest">Bağlantı testi</button><div id="testSonuc" style="margin-top:10px;font-family:var(--mono);font-size:13px;line-height:1.6"></div></div>`;
   else if (canli && !canli.ham.length) ic = `<div class="bos">Sitenin canlı listesi şu an boş görünüyor. Türkiye saatiyle sabahın erken saatlerinde genelde sadece Asya ve Avustralya maçları olur.${taniHtml(canli)}<br><br><button class="yenile" id="cTest">Bağlantı testi</button><div id="testSonuc" style="margin-top:10px;font-family:var(--mono);font-size:13px;line-height:1.6"></div></div>`;
   else if (canli && !liste.length) ic = `<div class="bos">Şu an ${toplamHam} maç canlı ama hiçbiri filtrelerine uymuyor. Canlı listede çoğunlukla alt lig, kadın ve altyapı maçları olur — <b>Filtresiz göster</b>'e basarak hepsini görebilirsin.</div>`;
+  else if (nabizAcik) ic = nabizHtml();
   else if (canli) ic = liste.map(canliKart).join("");
   el.innerHTML = bas + ic;
 }
 
 $("canli").addEventListener("click", e => {
-  if (e.target.id === "cYenile") canliYukle();
+  if (e.target.id === "cNabiz") {
+    nabizAcik = !nabizAcik; canliCiz();
+    if (nabizAcik) nabizCek().then(canliCiz);
+    return;
+  }
+  if (e.target.id === "cYenile") { if (nabizAcik) nabizCek().then(canliCiz); canliYukle() }
   if (e.target.id === "cTest") baglantiTesti();
   if (e.target.id === "cHepsi") { canliFiltresiz = !canliFiltresiz; canliCiz(); yzIste(canliListe()) }
 });
